@@ -1,3 +1,88 @@
+
+def connectToNewCategory(a_href_el, insertDataList):
+    # 새로운 URL 생성
+    new_url = f"http://www.coupang.com{a_href_el}"
+
+    # 새로운 페이지로 이동
+    driver.get(new_url)
+
+    # 페이지가 로딩 완료될 때까지 기다리기
+    wait = WebDriverWait(driver, 10)
+    wait.until(lambda driver: driver.execute_script('return document.readyState') == 'complete')
+
+    ############################################################################
+
+    # '#gnbAnalytics > ul.menu.shopping-menu-list' 선택자로 요소 찾기
+    menu_list = soup.select_one('#searchCategoryComponent > ul.search-option-items')
+
+    if menu_list:
+        # 모든 <li> 요소 찾기
+        depth4_li_el_list = menu_list.find_all('li', recursive=False) # recursive=False 면 바로 밑 하위 엘레먼트만 조회
+        for depth4_li_el in depth4_li_el_list:
+            # depth4 텍스트 추출 (li 바로 아래의 첫 번째 <a> 태그)
+            a_el = depth4_li_el.find('a', recursive=False)
+            if a_el:
+                a_href_el = a_el.get('href')
+
+                depth4_category_id = 'None'
+                if len(a_href_el.split('/')) > 4:                
+                    depth4_category_id = a_href_el.split('/')[4]            
+
+                text = a_el.get_text(strip=True) #카테고리명
+
+                insertDataList.append({
+                    'category_id': depth4_category_id,
+                    'depth': 4,
+                    'text': text,
+                    'parent_id': None #TODO: 일단 none으로
+                })
+                
+                print("         Depth 4:", text, " categoryid=", depth4_category_id)
+
+                # depth5 텍스트 추출
+                #depth2_li_el_list = depth4_li_el.find_all('li', class_='second-depth-list')
+                depth5_li_el_list = depth4_li_el.select('ul > li')
+                for depth5_li_el in depth5_li_el_list:
+                    a_el = depth5_li_el.find('a')
+                    if a_el:
+                        a_href_el = a_el.get('href')
+
+                        depth5_category_id = 'None'
+                        if len(a_href_el.split('/')) > 4:                
+                            depth5_category_id = a_href_el.split('/')[4]            
+                        text = a_el.get_text(strip=True) #카테고리명
+
+                        insertDataList.append({
+                            'category_id': depth5_category_id,
+                            'depth': 5,
+                            'text': text,
+                            'parent_id': depth4_category_id
+                        })
+
+                        print("             Depth 5:", text, " categoryid=", depth5_category_id)
+
+                        # depth6 텍스트 추출
+                        depth6_li_el_list = depth5_li_el.find_all('li')                        
+                        for depth6_li_el in depth6_li_el_list:
+                            a_el = depth6_li_el.find('a')
+                            if a_el:                            
+                                a_href_el = a_el.get('href')
+
+                                depth6_category_id = 'None'
+                                if len(a_href_el.split('/')) > 4:                
+                                    depth6_category_id = a_href_el.split('/')[4]
+                                text = a_el.get_text(strip=True) #카테고리명
+
+                                insertDataList.append({
+                                    'category_id': depth6_category_id,
+                                    'depth': 6,
+                                    'text': text,
+                                    'parent_id': depth5_category_id
+                                })
+                                print("             Depth 6:", text, " categoryid=", depth6_category_id)
+
+
+
 ####################################
 # 패키지 설치
 ####################################
@@ -14,7 +99,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from bs4 import BeautifulSoup
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.chrome.options import Options
 import sys
+import random
+import time
+
+
 
 ####################################
 # 출력을 'xs.txt' 파일로 리다이렉트
@@ -29,6 +119,7 @@ sys.stdout = open('xs.txt', 'w', encoding='utf-8')
 # 브라우저 자동 꺼짐 방지 옵션
 chrome_options = Options()
 chrome_options.add_experimental_option("detach", True)
+chrome_options.add_argument('--disable-blink-features=AutomationControlled')
 
 # 브라우저 자동 꺼짐 방지 옵션
 driver = webdriver.Chrome(options=chrome_options)
@@ -116,7 +207,9 @@ if menu_list:
 
                     # depth3 텍스트 추출
                     depth3_li_el_list = depth2_li_el.find_all('li')
-                    for depth3_li_el in depth3_li_el_list:
+
+                    for index, depth3_li_el in enumerate(depth3_li_el_list):
+                    #for depth3_li_el in depth3_li_el_list:
                         a_el = depth3_li_el.find('a')
                         if a_el:                            
                             a_href_el = a_el.get('href')
@@ -134,6 +227,12 @@ if menu_list:
                             })
                             print("    Depth 3:", text, " categoryid=", depth2_category_id)
 
+                            # depth 4이상 팀험
+                            if len(depth3_li_el_list)-1 == index: #마지막 loop
+                                connectToNewCategory(a_href_el, insertDataList)                                                                
+                                delay = random.uniform(4, 10)
+                                time.sleep(delay)
+                                
             print()  # 각 depth1 요소 사이에 빈 줄 추가
 else:
     print("요소를 찾을 수 없습니다.")
@@ -173,7 +272,4 @@ for data in insertDataList:
 mydb.commit()
 
 print(mycursor.rowcount, "record inserted.")
-
-
-
 
